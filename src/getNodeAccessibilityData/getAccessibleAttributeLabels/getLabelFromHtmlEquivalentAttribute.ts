@@ -38,15 +38,7 @@ const ariaToHTMLAttributeMapping: Record<
     { elements: ["input", "select", "textarea"], name: "autocomplete" },
   ],
   "aria-checked": [
-    {
-      elements: ["input"],
-      implicitMissingValue: "false",
-      name: "checked",
-      properties: [
-        { key: "type", value: "checkbox" },
-        { key: "type", value: "radio" },
-      ],
-    },
+    // A checkbox or radio input is handled by getNativeCheckedValue.
     {
       value: "mixed",
       name: "indeterminate",
@@ -116,6 +108,29 @@ const ariaToHTMLAttributeMapping: Record<
   "aria-selected": [{ elements: ["option"], name: "selected" }],
 };
 
+const isNativeCheckable = (node: HTMLElement): node is HTMLInputElement =>
+  getLocalName(node) === "input" &&
+  ["checkbox", "radio"].includes((node as HTMLInputElement).type);
+
+/**
+ * The checked state of a checkbox or radio input is its `checked` property
+ * (its checkedness), and a checkbox is "mixed" when its `indeterminate`
+ * property is true. The `checked` content attribute only sets the initial
+ * state: once the user toggles the input, or a script sets `checked`, the
+ * attribute no longer reflects it. There is no `indeterminate` content
+ * attribute. Browsers expose this native state and ignore `aria-checked` on
+ * these inputs, which authors must not use there.
+ *
+ * REFs:
+ * - https://html.spec.whatwg.org/multipage/input.html#concept-fe-checked
+ * - https://www.w3.org/TR/html-aam-1.0/#el-input-checkbox
+ * - https://www.w3.org/TR/html-aria/#el-input-checkbox
+ */
+const getNativeCheckedValue = (node: HTMLInputElement) =>
+  node.type === "checkbox" && node.indeterminate
+    ? "mixed"
+    : String(node.checked);
+
 export const getLabelFromHtmlEquivalentAttribute = ({
   attributeName,
   container,
@@ -126,6 +141,18 @@ export const getLabelFromHtmlEquivalentAttribute = ({
   node: HTMLElement;
 }): { label: string; value: string } => {
   const htmlAttribute = ariaToHTMLAttributeMapping[attributeName];
+
+  if (attributeName === "aria-checked" && isNativeCheckable(node)) {
+    const attributeValue = getNativeCheckedValue(node);
+    const label = mapAttributeNameAndValueToLabel({
+      attributeName,
+      attributeValue,
+      container,
+      node,
+    });
+
+    return { label: label ?? "", value: attributeValue };
+  }
 
   if (!htmlAttribute?.length) {
     return { label: "", value: "" };

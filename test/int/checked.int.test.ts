@@ -74,7 +74,8 @@ describe("Checked Attribute State", () => {
     await virtual.stop();
   });
 
-  it("should announce that a checkbox with a checked attribute set to false is 'not checked'", async () => {
+  it("should announce that a checkbox with a checked attribute set to false is 'checked'", async () => {
+    // Any checked attribute makes the checkbox checked, whatever its value.
     document.body.innerHTML = `
     <fieldset>
       <legend>Choose your monster's features:</legend>
@@ -96,14 +97,13 @@ describe("Checked Attribute State", () => {
     await virtual.next();
     await virtual.next();
 
-    expect(await virtual.lastSpokenPhrase()).toBe(
-      "checkbox, Scales, not checked"
-    );
+    expect(await virtual.lastSpokenPhrase()).toBe("checkbox, Scales, checked");
 
     await virtual.stop();
   });
 
-  it("should announce that a checkbox with an aria-checked attribute set to true is 'checked'", async () => {
+  it("should ignore an aria-checked attribute set to true on a native checkbox", async () => {
+    // Browsers expose the native checked state, not aria-checked, here.
     document.body.innerHTML = `
     <fieldset>
       <legend>Choose your monster's features:</legend>
@@ -125,7 +125,9 @@ describe("Checked Attribute State", () => {
     await virtual.next();
     await virtual.next();
 
-    expect(await virtual.lastSpokenPhrase()).toBe("checkbox, Scales, checked");
+    expect(await virtual.lastSpokenPhrase()).toBe(
+      "checkbox, Scales, not checked"
+    );
 
     await virtual.next();
     await virtual.next();
@@ -233,6 +235,106 @@ describe("Checked Attribute State", () => {
 
     expect(await virtual.lastSpokenPhrase()).toBe(
       "checkbox, Some text, not checked"
+    );
+
+    await virtual.stop();
+  });
+  it("should announce a checkbox checked by a click as 'checked'", async () => {
+    document.body.innerHTML = `
+      <input type="checkbox" id="scales" />
+      <label for="scales">Scales</label>
+      <button>Next</button>
+    `;
+
+    await virtual.start({ container: document.body });
+    await virtual.next();
+
+    expect(await virtual.lastSpokenPhrase()).toBe(
+      "checkbox, Scales, not checked"
+    );
+
+    await virtual.click();
+
+    expect(
+      (document.getElementById("scales") as HTMLInputElement).checked
+    ).toBe(true);
+
+    await virtual.next();
+    await virtual.next();
+    await virtual.previous();
+    await virtual.previous();
+
+    expect(await virtual.lastSpokenPhrase()).toBe("checkbox, Scales, checked");
+
+    await virtual.stop();
+  });
+
+  it("should announce the checked property, not the checked attribute", async () => {
+    document.body.innerHTML = `
+      <input type="checkbox" id="scales" checked />
+      <label for="scales">Scales</label>
+      <input type="checkbox" id="horns" />
+      <label for="horns">Horns</label>
+    `;
+
+    (document.getElementById("scales") as HTMLInputElement).checked = false;
+    (document.getElementById("horns") as HTMLInputElement).checked = true;
+
+    await virtual.start({ container: document.body });
+    await virtual.next();
+
+    expect(await virtual.lastSpokenPhrase()).toBe(
+      "checkbox, Scales, not checked"
+    );
+
+    await virtual.next();
+    await virtual.next();
+
+    expect(await virtual.lastSpokenPhrase()).toBe("checkbox, Horns, checked");
+
+    await virtual.stop();
+  });
+
+  it("should announce an indeterminate checkbox as 'partially checked'", async () => {
+    document.body.innerHTML = `
+      <input type="checkbox" id="all" />
+      <label for="all">All condiments</label>
+    `;
+
+    (document.getElementById("all") as HTMLInputElement).indeterminate = true;
+
+    await virtual.start({ container: document.body });
+    await virtual.next();
+
+    expect(await virtual.lastSpokenPhrase()).toBe(
+      "checkbox, All condiments, partially checked"
+    );
+
+    await virtual.stop();
+  });
+
+  it("should announce a radio button checked by a script as 'checked'", async () => {
+    document.body.innerHTML = `
+      <input type="radio" id="standard" name="shipping" checked />
+      <label for="standard">Standard</label>
+      <input type="radio" id="express" name="shipping" />
+      <label for="express">Express</label>
+    `;
+
+    (document.getElementById("express") as HTMLInputElement).checked = true;
+
+    await virtual.start({ container: document.body });
+    await virtual.next();
+
+    expect(await virtual.lastSpokenPhrase()).toBe(
+      "radio, Standard, not checked, position 1, set size 2"
+    );
+
+    await virtual.next();
+    await virtual.next();
+
+    expect(await virtual.lastSpokenPhrase()).toBe(
+      "radio, Express, checked, position 2, set size 2"
     );
 
     await virtual.stop();
